@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>TrackoVex - A Simple Solution</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            ios: {
+              bg: '#000000',
+              glass: 'rgba(255, 255, 255, 0.12)',
+              glassBorder: 'rgba(255, 255, 255, 0.2)',
+              arrow: '#ffffff',
+              green: '#30d158',
+              blue: '#0a84ff',
+              gray: '#8e8e93'
+            }
+          },
+          animation: {
+            'spin-dots': 'spinDots 12s linear infinite',
+            'float-disc': 'floatDisc 4s ease-in-out infinite',
+            'pulse-glow': 'pulseGlow 2.5s ease-in-out infinite'
+          },
+          keyframes: {
+            spinDots: {
+              '0%': { transform: 'rotate(0deg)' },
+              '100%': { transform: 'rotate(360deg)' }
+            },
+            floatDisc: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-8px)' }
+            },
+            pulseGlow: {
+              '0%, 100%': { opacity: '0.4', transform: 'scale(0.96)' },
+              '50%': { opacity: '0.9', transform: 'scale(1.04)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18, ReactDOM, Babel, Lucide Icons -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Web Audio AirTag Sound Synthesizer -->
+  <script>
+    window.playAirTagSound = function() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = audioCtx.currentTime;
+        const notes = [
+          { freq: 1174.66, time: 0.00, dur: 0.10 },
+          { freq: 1479.98, time: 0.09, dur: 0.10 },
+          { freq: 1760.00, time: 0.18, dur: 0.12 },
+          { freq: 2349.32, time: 0.28, dur: 0.22 }
+        ];
+        notes.forEach(n => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(n.freq, now + n.time);
+          gain.gain.setValueAtTime(0, now + n.time);
+          gain.gain.linearRampToValueAtTime(0.3, now + n.time + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + n.time + n.dur);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + n.time);
+          osc.stop(now + n.time + n.dur);
+        });
+      } catch (e) {
+        console.warn("Audio autoplay blocked:", e);
+      }
+    };
+  </script>
+
+  <style>
+    /* Fullscreen iOS Native App Style */
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      color: #ffffff;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #root {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Heavy Liquid Glassmorphism for dark mode iOS UI */
+    .ios-liquid-glass {
+      background: rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(40px) saturate(210%);
+      -webkit-backdrop-filter: blur(40px) saturate(210%);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 
+        0 20px 50px rgba(0, 0, 0, 0.6),
+        inset 0 1px 2px rgba(255, 255, 255, 0.35);
+    }
+
+    .ios-circle-btn {
+      background: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ios-circle-btn:active {
+      transform: scale(0.92);
+      background: rgba(255, 255, 255, 0.28);
+    }
+
+    /* 3D Apple AirTag Metallic Token */
+    .airtag-disc-3d {
+      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #eef2f6 45%, #94a3b8 95%);
+      box-shadow: 
+        0 30px 60px -12px rgba(0, 0, 0, 0.6),
+        inset 0 4px 7px rgba(255, 255, 255, 0.95),
+        inset 0 -5px 7px rgba(0, 0, 0, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // --- Lucide Icon Helper ---
+    const Icon = ({ name, size = 20, className = "" }) => {
+      const iconRef = useRef(null);
+      useEffect(() => {
+        if (window.lucide && iconRef.current) {
+          iconRef.current.innerHTML = `<i data-lucide="${name}" class="${className}" style="width:${size}px; height:${size}px;"></i>`;
+          window.lucide.createIcons({ root: iconRef.current });
+        }
+      }, [name, size, className]);
+      return <span ref={iconRef} className={`inline-flex items-center justify-center align-middle ${className}`} style={{ width: size, height: size }}></span>;
+    };
+
+    // ==========================================
+    // 1. INTRO SPLASH SCREEN
+    // Follows the second and third images with TrackoVex logo
+    // ==========================================
+    function IntroSplash({ onContinue }) {
+      const [step, setStep] = useState(1);
+      const [animatingOut, setAnimatingOut] = useState(false);
+
+      const handleProceed = () => {
+        if (step === 1) {
+          setStep(2);
+        } else {
+          setAnimatingOut(true);
+          setTimeout(() => {
+            onContinue();
+          }, 700);
+        }
+      };
+
+      return (
+        <div className={`fixed inset-0 z-50 bg-black flex flex-col justify-between px-8 py-14 transition-all duration-700 select-none ${
+          animatingOut ? 'opacity-0 scale-125 filter blur-md pointer-events-none' : 'opacity-100 scale-100'
+        }`}>
+          {/* Top indicator */}
+          <div className="flex justify-center pt-2">
+            <div className="flex gap-2">
+              <span className={`w-2 h-2 rounded-full transition-all ${step === 1 ? 'w-6 bg-white' : 'bg-white/30'}`}></span>
+              <span className={`w-2 h-2 rounded-full transition-all ${step === 2 ? 'w-6 bg-white' : 'bg-white/30'}`}></span>
+            </div>
+          </div>
+
+          {/* 3D AirTag Disc with the Black TrackoVex Logo */}
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="relative animate-float-disc flex items-center justify-center mb-10">
+              <div className="w-56 h-56 rounded-full p-2 bg-gradient-to-tr from-slate-300 via-white to-slate-400 shadow-[0_25px_60px_rgba(255,255,255,0.15)] flex items-center justify-center">
+                <div className="w-full h-full rounded-full airtag-disc-3d flex items-center justify-center p-6 relative overflow-hidden">
+                  <div className="absolute inset-2 rounded-full border border-slate-300/60 pointer-events-none"></div>
+                  <img 
+                    src="logo_black.jpg" 
+                    alt="TrackoVex" 
+                    className="w-32 h-auto object-contain filter contrast-125"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center px-4 max-w-xs">
+              <h1 className="text-3xl font-extrabold text-white tracking-tight leading-snug">
+                {step === 1 ? "Lose your knack for losing things." : "Easy to manage, easy to replace."}
+              </h1>
+              <p className="text-sm text-slate-400 mt-2 font-medium">
+                TrackoVex • A Simple Solution
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom White Continue Button */}
+          <div className="w-full flex justify-center pb-2">
+            <button 
+              onClick={handleProceed}
+              className="w-full max-w-sm py-4 rounded-full bg-white text-black text-base font-bold tracking-tight shadow-xl hover:bg-slate-100 active:scale-95 transition-all"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 2. CANVAS-BASED SWARMING DOTS COMPONENT
+    // Replicates Images 1 & 3: Circular Cloud of Glistening Particles
+    // ==========================================
+    function ParticleRadarRing({ isSearching }) {
+      const canvasRef = useRef(null);
+
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let animationFrameId;
+
+        // Size setup
+        const size = Math.min(window.innerWidth * 0.85, 340);
+        canvas.width = size;
+        canvas.height = size;
+
+        const centerX = size / 2;
+        const centerY = size / 2;
+        const baseRadius = size * 0.38;
+
+        // Generate ~110 random sparkling particles along circular band
+        const particleCount = 115;
+        const particles = Array.from({ length: particleCount }).map(() => ({
+          angle: Math.random() * Math.PI * 2,
+          radiusOffset: (Math.random() - 0.5) * 44, // thickness band of the ring
+          speed: 0.006 + Math.random() * 0.012,
+          baseSize: 1.8 + Math.random() * 3.2,
+          alpha: 0.2 + Math.random() * 0.8,
+          pulseSpeed: 0.02 + Math.random() * 0.04
+        }));
+
+        const render = () => {
+          ctx.clearRect(0, 0, size, size);
+
+          particles.forEach(p => {
+            p.angle += p.speed;
+            p.alpha += Math.sin(Date.now() * 0.003 * p.pulseSpeed) * 0.02;
+            const currentAlpha = Math.max(0.15, Math.min(0.95, p.alpha));
+
+            const currentR = baseRadius + p.radiusOffset + Math.sin(p.angle * 3) * 6;
+            const x = centerX + Math.cos(p.angle) * currentR;
+            const y = centerY + Math.sin(p.angle) * currentR;
+
+            ctx.beginPath();
+            ctx.arc(x, y, p.baseSize, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha})`;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
+            ctx.fill();
+          });
+
+          animationFrameId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+          cancelAnimationFrame(animationFrameId);
+        };
+      }, [isSearching]);
+
+      return (
+        <div className="relative flex items-center justify-center">
+          <canvas ref={canvasRef} className="block select-none pointer-events-none" />
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 3. MINIMAL DIRECTION ARROW WITH ARC
+    // Replicates Image 2: Apple AirTag Precision Finding Pointer
+    // ==========================================
+    function DirectionArrowView({ angle = 45, directionText = "to your right" }) {
+      return (
+        <div className="relative flex flex-col items-center justify-center my-6">
+          
+          {/* Subtle Direction Arc & Guide Dot (matching reference image 2) */}
+          <div className="relative w-64 h-64 flex items-center justify-center">
+            
+            {/* Guide Arc on top right */}
+            <svg className="absolute w-56 h-56 pointer-events-none" viewBox="0 0 100 100">
+              <path 
+                d="M 50,15 A 35,35 0 0,1 85,50" 
+                fill="none" 
+                stroke="rgba(255, 255, 255, 0.45)" 
+                strokeWidth="4" 
+                strokeLinecap="round" 
+              />
+              {/* Dot at start of arc */}
+              <circle cx="50" cy="15" r="3.5" fill="rgba(255, 255, 255, 0.6)" />
+              {/* Dot at end of arc */}
+              <circle cx="85" cy="50" r="3.5" fill="#ffffff" />
+            </svg>
+
+            {/* Apple SF Style Direction Arrow SVG */}
+            <div 
+              className="relative transition-transform duration-500 ease-out"
+              style={{ transform: `rotate(${angle}deg)` }}
+            >
+              <svg width="140" height="140" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Thick rounded diagonal arrow matching reference */}
+                <path 
+                  d="M 28,72 L 68,32 M 68,32 L 38,32 M 68,32 L 68,62" 
+                  stroke="#ffffff" 
+                  strokeWidth="14" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                />
+              </svg>
+            </div>
+
+          </div>
+
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 4. MAIN AIRTAG HOMEPAGE COMPONENT
+    // ==========================================
+    function TrackoVexApp() {
+      const [showIntro, setShowIntro] = useState(true);
+      
+      // ESP32 Devices list (Zero devices initially)
+      const [devices, setDevices] = useState([]);
+      const [selectedDevice, setSelectedDevice] = useState(null);
+
+      // Search state: 'searching' (dots ring) vs 'found' (arrow + distance)
+      const [searchState, setSearchState] = useState("searching"); // 'searching', 'found'
+      
+      // Dynamic simulated distance and angle
+      const [distanceVal, setDistanceVal] = useState(7);
+      const [distanceUnit, setDistanceUnit] = useState("ft");
+      const [directionLabel, setDirectionLabel] = useState("to your right");
+      const [arrowAngle, setArrowAngle] = useState(0);
+
+      // Bluetooth Scanner Modal State
+      const [isScanningBLE, setIsScanningBLE] = useState(false);
+      const [bleStatus, setBleStatus] = useState("idle");
+      const [discoveredESP, setDiscoveredESP] = useState(null);
+
+      // Renaming State
+      const [isRenaming, setIsRenaming] = useState(false);
+      const [renameInput, setRenameInput] = useState("");
+
+      // Feedback Toast
+      const [toastMsg, setToastMsg] = useState(null);
+
+      const notify = (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(null), 3000);
+      };
+
+      // Sound Trigger
+      const handlePlayChime = () => {
+        window.playAirTagSound();
+        notify("Playing acoustic chime on TrackoVex...");
+      };
+
+      // Periodic Live Ultra Wideband (UWB) distance and angle jitter
+      useEffect(() => {
+        if (!selectedDevice) return;
+        const interval = setInterval(() => {
+          if (searchState === "found") {
+            setDistanceVal(prev => {
+              const delta = (Math.random() * 2 - 1);
+              const nextVal = Math.max(1, Math.round(prev + delta));
+              return nextVal;
+            });
+            setArrowAngle(prev => (prev + (Math.random() * 10 - 5)));
+          }
+        }, 1600);
+        return () => clearInterval(interval);
+      }, [selectedDevice, searchState]);
+
+      // Web Bluetooth / Simulated ESP32 BLE Connect
+      const startBLEScan = async () => {
+        setIsScanningBLE(true);
+        setBleStatus("scanning");
+
+        if (navigator.bluetooth) {
+          try {
+            const dev = await navigator.bluetooth.requestDevice({
+              acceptAllDevices: true,
+              optionalServices: ['battery_service']
+            });
+            if (dev) {
+              setDiscoveredESP({
+                id: dev.id || `ESP32-${Math.floor(1000 + Math.random() * 9000)}`,
+                rawName: dev.name || "ESP32_TrackoVex_AirTag",
+                rssi: "-50 dBm"
+              });
+              setBleStatus("discovered");
+              return;
+            }
+          } catch (e) {
+            console.log("Web Bluetooth fallback:", e);
+          }
+        }
+
+        // ESP32 Discovery Simulation
+        setTimeout(() => {
+          setDiscoveredESP({
+            id: `ESP32-${Math.floor(1000 + Math.random() * 9000)}`,
+            rawName: "ESP32_TrackoVex_AirTag",
+            rssi: "-48 dBm"
+          });
+          setBleStatus("discovered");
+        }, 1800);
+      };
+
+      // Pair & Register
+      const confirmPairDevice = () => {
+        if (!discoveredESP) return;
+        const newDevice = {
+          id: discoveredESP.id,
+          name: "Ben’s Camera", // Matching reference image 1, 2, 3 name
+          battery: 100,
+          rawName: discoveredESP.rawName
+        };
+        setDevices([newDevice, ...devices]);
+        setSelectedDevice(newDevice);
+        setSearchState("searching"); // Begins with searching dots as in image 1 & 3
+        setIsScanningBLE(false);
+        setDiscoveredESP(null);
+        setBleStatus("idle");
+        notify("ESP32 Connected! Searching for beacon...");
+
+        // Auto transition from searching dots (Image 1/3) to found arrow (Image 2) after 3.2s
+        setTimeout(() => {
+          setSearchState("found");
+          setDistanceVal(7);
+          notify("TrackoVex signal locked!");
+        }, 3200);
+      };
+
+      // Rename handlers
+      const openRename = (dev) => {
+        setRenameInput(dev.name);
+        setIsRenaming(true);
+      };
+
+      const saveRename = () => {
+        if (!renameInput.trim()) return;
+        const clean = renameInput.trim();
+        setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, name: clean } : d));
+        setSelectedDevice(prev => ({ ...prev, name: clean }));
+        setIsRenaming(false);
+        notify(`Renamed to "${clean}"`);
+      };
+
+      const handleUnpair = () => {
+        setDevices([]);
+        setSelectedDevice(null);
+        setSearchState("searching");
+        notify("Device removed");
+      };
+
+      return (
+        <div className="relative w-screen h-screen flex flex-col bg-black text-white overflow-hidden select-none font-sans">
+          
+          {/* 1. Animated Intro Zoom-Out Splash */}
+          {showIntro && (
+            <IntroSplash onContinue={() => setShowIntro(false)} />
+          )}
+
+          {/* Toast Notification */}
+          {toastMsg && (
+            <div className="fixed top-6 inset-x-6 z-50 flex items-center justify-center pointer-events-none">
+              <div className="px-5 py-2.5 rounded-full ios-liquid-glass shadow-2xl text-white text-xs font-semibold flex items-center gap-2 animate-bounce">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span>{toastMsg}</span>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              TOP STATUS BAR & HEADER (MATCHING REFERENCE IMAGES)
+              "FINDING"
+              "Ben's Camera"
+              ======================================================== */}
+          <div className="w-full pt-12 px-7 pb-4 flex items-start justify-between z-20">
+            <div>
+              {/* Small "FINDING" uppercase label matching image */}
+              <div className="text-[12px] font-bold uppercase tracking-wider text-neutral-400 font-sans">
+                {selectedDevice ? (searchState === "searching" ? "FINDING" : "NEARBY") : "TRACKOVEX"}
+              </div>
+
+              {/* Title: Device Name (e.g. Ben's Camera) with Edit Pencil */}
+              <div className="flex items-center gap-2.5 mt-0.5">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white font-sans">
+                  {selectedDevice ? selectedDevice.name : "No Device Paired"}
+                </h1>
+                {selectedDevice && (
+                  <button 
+                    onClick={() => openRename(selectedDevice)}
+                    className="p-1 rounded-full text-neutral-400 hover:text-white transition-colors"
+                    title="Rename"
+                  >
+                    <Icon name="edit-2" size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Menu / Pair CTA */}
+            <div className="flex items-center gap-2 pt-1">
+              {!selectedDevice ? (
+                <button 
+                  onClick={startBLEScan}
+                  className="px-4 py-2 rounded-full bg-white text-black text-xs font-bold shadow-lg active:scale-95 transition-all"
+                >
+                  Connect BLE
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setSearchState(prev => prev === 'searching' ? 'found' : 'searching')}
+                  className="px-3 py-1.5 rounded-full ios-circle-btn text-[11px] font-bold text-neutral-300"
+                  title="Toggle Searching / Found State"
+                >
+                  {searchState === 'searching' ? "View Arrow" : "View Radar"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ========================================================
+              CENTER CANVAS: MINIMAL DIRECTION ARROW & SWARMING DOTS
+              ======================================================== */}
+          <div className="flex-1 w-full flex flex-col items-center justify-center relative px-6 z-10">
+            
+            {/* If NO DEVICE paired: Clean ESP32 Pairing Prompt */}
+            {!selectedDevice && (
+              <div className="flex flex-col items-center justify-center text-center p-8">
+                <div className="w-24 h-24 rounded-full ios-liquid-glass flex items-center justify-center mb-6 shadow-2xl">
+                  <Icon name="bluetooth" size={38} className="text-blue-500" />
+                </div>
+                <h2 className="text-xl font-bold text-white">No TrackoVex AirTag Found</h2>
+                <p className="text-sm text-neutral-400 max-w-xs mt-2 leading-relaxed">
+                  Turn on your ESP32 Bluetooth beacon and tap connect to begin Precision Finding.
+                </p>
+                <button 
+                  onClick={startBLEScan}
+                  className="mt-6 px-7 py-3.5 rounded-full bg-white text-black text-sm font-bold shadow-2xl active:scale-95 transition-transform"
+                >
+                  Pair ESP32 (BLE)
+                </button>
+              </div>
+            )}
+
+            {/* If Device is Selected: Toggle between Searching Dots (Img 1/3) & Direction Arrow (Img 2) */}
+            {selectedDevice && (
+              <div className="w-full flex flex-col items-center justify-center">
+                
+                {searchState === "searching" ? (
+                  /* 1. SEARCHING STATE: Circular Swarming Dots (Reference Images 1 & 3) */
+                  <div className="flex flex-col items-center justify-center animate-fade-in">
+                    <ParticleRadarRing isSearching={true} />
+                  </div>
+                ) : (
+                  /* 2. FOUND STATE: Direction Arrow & Guide Arc (Reference Image 2) */
+                  <div className="flex flex-col items-center justify-center animate-fade-in">
+                    <DirectionArrowView angle={arrowAngle} directionText={directionLabel} />
+                  </div>
+                )}
+
+              </div>
+            )}
+
+          </div>
+
+          {/* ========================================================
+              BOTTOM ESTIMATED DISTANCE & CONTROLS (MATCHING REFERENCE IMAGES)
+              "7 ft" / "11 ft"
+              "to your right"
+              Bottom Left (X button) | Bottom Right (Speaker button)
+              ======================================================== */}
+          {selectedDevice && (
+            <div className="w-full px-8 pb-12 pt-2 z-20 flex flex-col justify-end">
+              
+              {/* Estimated Distance Readout at Bottom Left (Reference Images 1, 2, 3) */}
+              <div className="mb-6 select-none">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-6xl sm:text-7xl font-extrabold tracking-tight text-white font-sans">
+                    {searchState === "searching" ? "11" : distanceVal}
+                  </span>
+                  <span className="text-4xl sm:text-5xl font-light text-neutral-400 font-sans">
+                    {distanceUnit}
+                  </span>
+                </div>
+
+                {/* Subtitle Direction Text (e.g. "to your right" from Image 2) */}
+                {searchState === "found" && (
+                  <div className="text-2xl sm:text-3xl font-normal text-neutral-400 tracking-tight mt-0.5 font-sans">
+                    to your <span className="text-white font-bold">{directionLabel.replace("to your ", "")}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom iOS Circular Buttons: Close (X) & Sound (Speaker) matching reference */}
+              <div className="flex items-center justify-between">
+                
+                {/* Left: Circle 'X' Button to close / unpair */}
+                <button 
+                  onClick={handleUnpair}
+                  className="w-14 h-14 rounded-full ios-circle-btn flex items-center justify-center text-white"
+                  title="Disconnect"
+                >
+                  <Icon name="x" size={24} className="stroke-[2.5]" />
+                </button>
+
+                {/* Right: Circle Speaker Button to play sound chime */}
+                <button 
+                  onClick={handlePlayChime}
+                  className="w-14 h-14 rounded-full ios-circle-btn flex items-center justify-center text-white"
+                  title="Play Sound"
+                >
+                  <Icon name="volume-2" size={24} className="stroke-[2.2]" />
+                </button>
+
+              </div>
+
+            </div>
+          )}
+
+          {/* ========================================================
+              MODAL: RENAME DEVICE
+              ======================================================== */}
+          {isRenaming && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-xl animate-fade-in">
+              <div className="w-full max-w-sm rounded-[32px] ios-liquid-glass p-7 shadow-2xl space-y-4 border border-white/20">
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-white">Rename AirTag</h3>
+                  <p className="text-xs text-neutral-400 mt-1">Change your TrackoVex device name</p>
+                </div>
+
+                <div>
+                  <input 
+                    type="text"
+                    value={renameInput}
+                    onChange={(e) => setRenameInput(e.target.value)}
+                    placeholder="e.g. Ben’s Camera, Keys, Backpack"
+                    autoFocus
+                    className="w-full px-4 py-3.5 rounded-2xl bg-white/10 border border-white/20 text-white text-base font-semibold focus:outline-none focus:ring-2 focus:ring-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <button 
+                    onClick={() => setIsRenaming(false)}
+                    className="py-3 rounded-2xl bg-white/10 text-white text-xs font-bold hover:bg-white/20"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={saveRename}
+                    className="py-3 rounded-2xl bg-white text-black text-xs font-bold shadow-lg active:scale-95 transition-all"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              MODAL: ESP32 BLUETOOTH PAIRING
+              ======================================================== */}
+          {isScanningBLE && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/75 backdrop-blur-xl animate-fade-in">
+              <div className="w-full sm:max-w-sm rounded-t-[36px] sm:rounded-[36px] ios-liquid-glass p-7 shadow-2xl space-y-5 border border-white/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon name="bluetooth" size={22} className="text-blue-400" />
+                    <h3 className="text-lg font-bold text-white">Pair ESP32 TrackoVex</h3>
+                  </div>
+                  <button onClick={() => setIsScanningBLE(false)} className="p-1 text-neutral-400 hover:text-white">
+                    <Icon name="x" size={20} />
+                  </button>
+                </div>
+
+                {bleStatus === "scanning" && (
+                  <div className="py-8 flex flex-col items-center text-center">
+                    <div className="w-16 h-16 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mb-3 animate-spin">
+                      <Icon name="radio" size={30} />
+                    </div>
+                    <p className="text-sm font-bold text-white">Listening for Bluetooth Signals...</p>
+                    <p className="text-xs text-neutral-400 mt-1">Ensure your ESP32 beacon is powered on</p>
+                  </div>
+                )}
+
+                {bleStatus === "discovered" && discoveredESP && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                          <Icon name="cpu" size={20} />
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-white">{discoveredESP.rawName}</div>
+                          <div className="text-[11px] text-neutral-400 font-mono">ESP32 UWB Transceiver</div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-emerald-400">{discoveredESP.rssi}</span>
+                    </div>
+
+                    <button 
+                      onClick={confirmPairDevice}
+                      className="w-full py-4 rounded-2xl bg-white text-black text-xs font-bold shadow-xl active:scale-95 transition-all"
+                    >
+                      Connect & Begin Finding
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // Mount Application
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<TrackoVexApp />);
+  </script>
+</body>
+</html>
